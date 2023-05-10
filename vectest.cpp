@@ -33,10 +33,17 @@ float FM_FREQ =             180.0f;
 float ENV_FREQ =              4.0f;
 
 using namespace dspheaders;
-WaveTable carrier = WaveTable(TRIANGLE, TABLE_LEN, SAMPLE_RATE, LINEAR);
-WaveTable modulator = WaveTable(SINE, TABLE_LEN, SAMPLE_RATE, LINEAR);
+WaveTable sine = WaveTable(SINE, TABLE_LEN, SAMPLE_RATE, LINEAR);
+WaveTable triangle = WaveTable(TRIANGLE, TABLE_LEN, SAMPLE_RATE, LINEAR);
+WaveTable square = WaveTable(SQUARE, TABLE_LEN, SAMPLE_RATE, LINEAR);
+WaveTable saw = WaveTable(SAW, TABLE_LEN, SAMPLE_RATE, LINEAR);
 
+WaveTable transfer = WaveTable(SAW, TABLE_LEN, SAMPLE_RATE, LINEAR);
 WaveTable envelope = WaveTable(ENV, TABLE_LEN, SAMPLE_RATE, LINEAR);
+
+std::vector<WaveTable> vecTables = {sine, triangle, square, saw};
+
+VectorOscillator vec = VectorOscillator(vecTables, SAMPLE_RATE, LINEAR);
 
 static frame data;
 
@@ -59,22 +66,31 @@ static int paCallback(  const void* inputBuffer,				// input
     
 	for (i = 0; i < framesPerBuffer; i++) { // loop over buffer
     // float mono = carrier.interpolate() * envelope.interpolate();
-    float car = carrier.play(modulator.play());
-    float env = envelope.play();
+    // float car = carrier.play(modulator.play());
+    // float env = envelope.play();
     
-    data -> left = car * env;
-    data -> right = car * env;
+    float temp = vec.play(transfer.play()) * envelope.play();
+    data->left = temp;
+    data->right = temp;
+
+    // data -> left = car * env;
+    // data -> right = car * env;
     // write data to the out buffer
     *out++ = data -> left; 
     *out++ = data -> right;
+
+    // the modulator modulates the carriers phase
+    // carrier.movePointer(modulator.interpolate());
+    // modulator.movePointer();
+    // envelope.movePointer(); 
+
 	}
 	return 0;
 }
 
 
 int main(int argc, char** argv) {
-  carrier.frequency = FREQ;
-  modulator.frequency = FM_FREQ;
+  vec.frequency = FREQ;
   envelope.frequency = ENV_FREQ;
     if ( argc > 3 && argc < 8 ) {
       argc--;
@@ -83,17 +99,11 @@ int main(int argc, char** argv) {
         if ((*argv)[0] == '-') {
           printf("%c\n", (*argv)[1]);
           switch ((*argv)[1]){
-            case 'c': {
+            case 'v': {
               argc--;
               argv++;
               // carrier.frequency = std::stof(*argv);
-              carrier.frequency = std::stof(*argv);
-              break;
-            }
-            case 'm':{
-              argc--;
-              argv++;
-              modulator.frequency = std::stof(*argv);
+              vec.frequency = std::stof(*argv);
               break;
             }
             case 'e':{
@@ -117,6 +127,12 @@ int main(int argc, char** argv) {
     } else {
       printf("running on default frequencies\n");
     }
+
+  // transfer is used as guide wave to determine where between the tables in the vectoroscillator
+  // we want to read.
+  // This readpointer needs to be positive
+  transfer.unipolar();
+  transfer.frequency = 0.2f;
 
 	PaStream* stream;
 	PaError err;
