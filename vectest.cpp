@@ -1,4 +1,5 @@
 
+#include "dsp/dsp.h"
 #include "portaudio.h"
 #include <chrono>
 #include <cstdio>
@@ -69,7 +70,11 @@ static int paCallback(  const void* inputBuffer,				// input
     // float car = carrier.play(modulator.play());
     // float env = envelope.play();
     
-    float temp = vec.play(transfer.play()) * envelope.play();
+    float temp = vec.play(
+        map(
+          transfer.play(), -1.f, 1.f, 0.f, 1.f
+        )
+      ) * envelope.play();
     data->left = temp;
     data->right = temp;
 
@@ -131,7 +136,6 @@ int main(int argc, char** argv) {
   // transfer is used as guide wave to determine where between the tables in the vectoroscillator
   // we want to read.
   // This readpointer needs to be positive
-  transfer.unipolar();
   transfer.frequency = 0.2f;
 
 	PaStream* stream;
